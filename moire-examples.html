@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dice Grid — Moiré Examples</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+:root {
+  --bg: #F6F7F9; --fg: #17181C; --muted: #5E6270; --line: #D7DAE0;
+  --accent: #1F3A93; --surface: #FFFFFF;
+  --display: "Space Grotesk", system-ui, sans-serif;
+  --body: "Inter", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #121318; --fg: #ECEEF1; --muted: #9A9FAD; --line: #2B2E37;
+  --accent: #8EA6F0; --surface: #1B1D24; color-scheme: dark } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--body); }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 28px 16px 48px; display: grid; gap: 20px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: 1.9rem; margin: 0; letter-spacing: -0.01em; }
+.lede { margin: 6px 0 0; color: var(--muted); line-height: 1.55; max-width: 72ch; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center;
+  position: sticky; top: 0; z-index: 2; background: var(--bg); padding: 10px 0; border-bottom: 1px solid var(--line); }
+button { font: 500 0.95rem var(--body); background: var(--accent); color: var(--bg); border: 0;
+  padding: 10px 18px; border-radius: 6px; cursor: pointer; }
+button.ghost { background: transparent; color: var(--fg); box-shadow: inset 0 0 0 1px var(--line); }
+button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+label { display: inline-flex; gap: 8px; align-items: center; color: var(--muted); font-size: 0.9rem; }
+select { font: inherit; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+.tally { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr)); gap: 22px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.card h2 { font-family: var(--display); font-weight: 500; font-size: 1.15rem; margin: 0; }
+.card h2 span { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); font-weight: 400; margin-right: 6px; }
+.stage { width: 100%; }
+.stage canvas { display: block; width: 100% !important; height: auto !important; border-radius: 4px; }
+.card p { margin: 0; line-height: 1.5; font-size: 0.92rem; }
+.uses { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); }
+details { border-top: 1px solid var(--line); padding-top: 8px; }
+summary { cursor: pointer; font-size: 0.88rem; color: var(--accent); }
+pre { font-family: var(--mono); font-size: 0.74rem; line-height: 1.5; overflow-x: auto; background: var(--bg);
+  padding: 12px; border-radius: 6px; margin: 8px 0 0; }
+.copy { font-size: 0.8rem; padding: 6px 12px; margin-top: 8px; }
+.notes { color: var(--muted); font-size: 0.9rem; line-height: 1.55; max-width: 76ch; }
+.notes h3 { font-family: var(--display); color: var(--fg); font-weight: 500; margin: 0 0 6px; }
+.notes ul { margin: 0; padding-left: 18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Moiré, six more ways</h1>
+    <p class="lede">The same dice grid as the main sketch (face die = number of bands, turn die = start corner, invert die = colours), with six different moiré overlays. Each one is controlled by dice too: some add a fourth die per cell, others roll a few “global” dice for the whole artwork. Roll to reroll everything. Open “Code” under any example for a function you can drop into <code>sketch.js</code>.</p>
+  </header>
+
+  <div class="controls">
+    <button id="roll" type="button">Roll the dice</button>
+    <button id="play" type="button" class="ghost">Pause</button>
+    <label for="size">Grid
+      <select id="size">
+        <option value="3">3 × 3</option><option value="4">4 × 4</option><option value="5">5 × 5</option>
+        <option value="6" selected>6 × 6</option><option value="8">8 × 8</option><option value="10">10 × 10</option>
+      </select>
+    </label>
+    <span class="tally" id="tally"></span>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <h2><span>01</span>Twin grid</h2>
+      <div class="stage" id="p-twin"></div>
+      <div class="uses" id="u-twin"></div>
+      <p>A see-through copy of the grid sits on top of itself and slowly twists and zooms. Since both layers use the same dice, the moiré is the grid interfering with itself: giant fringes when the twist passes through zero, finer ones at the extremes. The <b>twist die</b> sets the largest angle in degrees.</p>
+      <details><summary>Code</summary><pre id="c-twin"></pre><button class="copy ghost" data-for="c-twin" type="button">Copy</button></details>
+    </section>
+
+    <section class="card">
+      <h2><span>02</span>Turntables</h2>
+      <div class="stage" id="p-turn"></div>
+      <div class="uses" id="u-turn"></div>
+      <p>Instead of one big disc, every cell gets its own little grating spinning inside it. A fourth <b>spin die</b> per cell sets the speed (×3°/s), and odd turn dice spin clockwise while even ones spin the other way, so neighbouring cells drift in and out of sync.</p>
+      <details><summary>Code</summary><pre id="c-turn"></pre><button class="copy ghost" data-for="c-turn" type="button">Copy</button></details>
+    </section>
+
+    <section class="card">
+      <h2><span>03</span>Beat fringes</h2>
+      <div class="stage" id="p-beat"></div>
+      <div class="uses" id="u-beat"></div>
+      <p>No rotation at all. One grating covers the canvas at 45°, parallel to the bands, with spacing just a hair wider than theirs. The small mismatch creates broad, soft stripes, like the “beat” you hear between two notes that are slightly out of tune. The <b>beat die</b> is roughly how many fringes cross the artwork.</p>
+      <details><summary>Code</summary><pre id="c-beat"></pre><button class="copy ghost" data-for="c-beat" type="button">Copy</button></details>
+    </section>
+
+    <section class="card">
+      <h2><span>04</span>Decoder</h2>
+      <div class="stage" id="p-dec"></div>
+      <div class="uses" id="u-dec"></div>
+      <p>A grating with <i>exactly</i> the band spacing slides one step and back. Tiles started from opposite corners (turn 1/5 vs. 3) sit half a step apart, so they flash solid light and solid dark in turn; turn 2/6 and 4 tiles cross the grating and stay hatched. The overlay “reads” the turn and invert dice that are hidden in the grid.</p>
+      <details><summary>Code</summary><pre id="c-dec"></pre><button class="copy ghost" data-for="c-dec" type="button">Copy</button></details>
+    </section>
+
+    <section class="card">
+      <h2><span>05</span>Ripples</h2>
+      <div class="stage" id="p-ring"></div>
+      <div class="uses" id="u-ring"></div>
+      <p>Two sets of concentric rings, one growing and one shrinking, each centred on a cell chosen by two dice (column, row). Where the rings cross each other you get the classic hyperbolic moiré; where they cross the diagonal bands you get curved fringes that bend around the centres.</p>
+      <details><summary>Code</summary><pre id="c-ring"></pre><button class="copy ghost" data-for="c-ring" type="button">Copy</button></details>
+    </section>
+
+    <section class="card">
+      <h2><span>06</span>Dot screen</h2>
+      <div class="stage" id="p-dot"></div>
+      <div class="uses" id="u-dot"></div>
+      <p>A different tile: the face die sets <i>dot size</i> instead of band count (like halftone printing), and even turn dice stagger the rows. A matching dot screen twists back and forth on top, giving the rosette moiré you see in magnified print. The <b>screen die</b> sets how far it twists.</p>
+      <details><summary>Code</summary><pre id="c-dot"></pre><button class="copy ghost" data-for="c-dot" type="button">Copy</button></details>
+    </section>
+  </div>
+
+  <div class="notes">
+    <h3>A few things to know when mixing these in</h3>
+    <ul>
+      <li>Examples 02–06 draw their overlay with a <code>DIFFERENCE</code> blend (white stripes flip light ↔ dark), so they show on inverted tiles too. To match the current sketch's “black on clear film” look, swap <code>blendMode(DIFFERENCE); fill(255)</code> for <code>fill('#000')</code>.</li>
+      <li>The decoder only works when the overlay spacing equals <code>bandSpacing()</code> and <code>bandRatio</code> is 0.5. Any other value gives you beat fringes (03) instead.</li>
+      <li>The overlays are independent, so they stack. Beat fringes + the existing spinning disc, or turntables + ripples, both work well.</li>
+      <li>The snippets use the globals from <code>sketch.js</code> (<code>N</code>, <code>dice</code>, <code>turns</code>, <code>inverts</code>, <code>bandSpacing</code>, <code>bandWidth</code>, <code>drawTile</code>). New dice (<code>spins</code>, <code>twistDie</code>, <code>beatDie</code>, <code>ringA/ringB</code>, <code>screenDie</code>) need to be rolled in <code>rollDice()</code>.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Snippets for sketch.js (p5 global mode) -->
+<script type="text/plain" id="s-twin">
+// TWIN GRID — a see-through copy of the grid twisting over itself.
+// twistDie (1–6): largest twist in degrees. Roll it in rollDice().
+let twinLayer, twistDie = 3;
+
+function buildTwin() {                       // call at the end of buildGrid()
+  if (twinLayer) twinLayer.remove();
+  twinLayer = createGraphics(width, height);
+  twinLayer.clear();
+  const cell = width / N;
+  for (let r = 0; r < N; r++)
+    for (let c = 0; c < N; c++)
+      drawTile(dice[r][c], turns[r][c], inverts[r][c], r, c, cell, twinLayer, true);
+}
+
+function drawTwin(t) {                       // t = seconds; call after the grid in draw()
+  const twist = radians(twistDie) * sin(t * 0.35);
+  const zoom = 1 + 0.004 * twistDie * sin(t * 0.23 + 1);
+  push();
+  translate(width / 2, height / 2);
+  rotate(twist);
+  scale(zoom);
+  translate(-width / 2, -height / 2);
+  image(twinLayer, 0, 0);
+  pop();
+}
+</script>
+<script type="text/plain" id="s-turn">
+// TURNTABLES — a small grating spinning inside every cell.
+// spins[r][c] (1–6): a 4th die per cell, roll it alongside the others.
+function drawTurntables(t) {
+  const s = width / N, P = bandSpacing(s), W = bandWidth(s);
+  blendMode(DIFFERENCE);
+  fill(255);
+  noStroke();
+  for (let r = 0; r < N; r++)
+    for (let c = 0; c < N; c++) {
+      const dir = turns[r][c] % 2 ? 1 : -1;            // odd turn die → clockwise
+      const start = ((turns[r][c] - 1) % 4) * HALF_PI + QUARTER_PI + 0.15;
+      push();
+      drawingContext.save();
+      drawingContext.beginPath();
+      drawingContext.rect(c * s, r * s, s, s);
+      drawingContext.clip();
+      translate((c + 0.5) * s, (r + 0.5) * s);
+      rotate(start + dir * radians(spins[r][c] * 3) * t);
+      for (let k = -4; k <= 4; k++) rect(-s, k * P - W / 2, 2 * s, W);
+      drawingContext.restore();
+      pop();
+    }
+  blendMode(BLEND);
+}
+</script>
+<script type="text/plain" id="s-beat">
+// BEAT FRINGES — a 45° grating a hair wider than the bands.
+// beatDie (1–6): about how many fringes cross the artwork.
+function drawBeat(t) {
+  const s = width / N, P = bandSpacing(s);
+  const Pb = P * (1 + beatDie / (6 * N));             // slightly mismatched spacing
+  const Wb = Pb * bandRatio;
+  const R = width * 0.75;
+  const phase = (t * P * 0.08) % Pb;                  // slow slide → fringes sweep
+  push();
+  translate(width / 2, height / 2);
+  rotate(QUARTER_PI);
+  blendMode(DIFFERENCE);
+  fill(255);
+  noStroke();
+  const n = ceil(R / Pb) + 1;
+  for (let k = -n; k <= n; k++) rect(-R, k * Pb + phase - Wb / 2, 2 * R, Wb);
+  blendMode(BLEND);
+  pop();
+}
+</script>
+<script type="text/plain" id="s-dec">
+// DECODER — a 45° grating with exactly the band spacing, anchored at the
+// canvas corner so it lines up with every tile. Needs bandRatio = 0.5.
+// Phase 0: turn-1/5 tiles go solid light, turn-3 tiles solid dark.
+// Phase P/2: the other way round. Turn 2/6 and 4 tiles stay hatched.
+function drawDecoder(t) {
+  const s = width / N, P = bandSpacing(s), W = P / 2;
+  const phase = W * (1 - cos(t * 0.7));               // 0 → P → 0
+  const R = width * 1.5;
+  push();
+  rotate(QUARTER_PI);                                 // frame anchored at (0, 0)
+  blendMode(DIFFERENCE);
+  fill(255);
+  noStroke();
+  const n = ceil(R / P);
+  for (let k = -n; k <= n; k++) rect(-R, k * P + phase - W, 2 * R, W);
+  blendMode(BLEND);
+  pop();
+}
+</script>
+<script type="text/plain" id="s-ring">
+// RIPPLES — two ring sets, one growing, one shrinking.
+// ringA, ringB: [columnDie, rowDie] pairs, rolled in rollDice().
+function drawRipples(t) {
+  const s = width / N, P = bandSpacing(s), W = bandWidth(s);
+  const R = dist(0, 0, width, height) + P;
+  blendMode(DIFFERENCE);
+  noFill();
+  stroke(255);
+  strokeWeight(W);
+  [ringA, ringB].forEach(([dc, dr], i) => {
+    const x = (floor((dc - 1) / 6 * N) + 0.5) * s;    // die → cell centre
+    const y = (floor((dr - 1) / 6 * N) + 0.5) * s;
+    const drift = (i ? -1 : 1) * t * P * 0.3;
+    for (let rad = ((drift % P) + P) % P; rad < R; rad += P) circle(x, y, rad * 2);
+  });
+  blendMode(BLEND);
+  noStroke();
+}
+</script>
+<script type="text/plain" id="s-dot">
+// DOT SCREEN — an alternative tile plus a twisting dot overlay.
+// Use drawDotTile in place of drawTile in buildGrid(). screenDie (1–6): max twist.
+function drawDotTile(v, t, k, r, c, s, g) {
+  const q = s / 6, inverted = k >= 4;
+  g.push();
+  g.translate(c * s, r * s);
+  g.drawingContext.save();
+  g.drawingContext.beginPath();
+  g.drawingContext.rect(0, 0, s, s);
+  g.drawingContext.clip();
+  g.noStroke();
+  g.fill(inverted ? INK : PAPER);
+  g.rect(0, 0, s, s);
+  g.fill(inverted ? PAPER : INK);
+  const d = q * (0.24 + 0.12 * v);                    // face 6 → dots almost touch
+  for (let j = 0; j < 6; j++)
+    for (let i = -1; i <= 6; i++) {
+      const shift = t % 2 === 0 && j % 2 ? 0.5 : 0;   // even turn die → staggered rows
+      g.circle((i + 0.5 + shift) * q, (j + 0.5) * q, d);
+    }
+  g.drawingContext.restore();
+  g.pop();
+}
+
+function drawScreen(t) {
+  const q = width / N / 6;
+  const a = radians(1 + screenDie * 1.5) * sin(t * 0.3);
+  push();
+  translate(width / 2, height / 2);
+  rotate(a);
+  blendMode(DIFFERENCE);
+  fill(255);
+  noStroke();
+  const n = ceil(width * 0.75 / q);
+  for (let j = -n; j <= n; j++)
+    for (let i = -n; i <= n; i++) circle((i + 0.5) * q, (j + 0.5) * q, q * 0.55);
+  blendMode(BLEND);
+  pop();
+}
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+<script>
+const PAPER = '#ECEEF1', INK = '#1B1B1E';
+const HALF = Math.PI / 2, QUARTER = Math.PI / 4;
+const FACES = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+const reduced = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+const S = { N: 6, dice: [], turns: [], inverts: [], spins: [], g: {}, rolls: 0, playing: !reduced };
+
+const d6 = () => 1 + Math.floor(Math.random() * 6);
+function rollFace(r) {
+  const home = (r % 6) + 1;
+  if (Math.random() < 0.75) return home;
+  const others = [1, 2, 3, 4, 5, 6].filter(f => f !== home);
+  return others[Math.floor(Math.random() * others.length)];
+}
+function rollAll() {
+  const grid = f => Array.from({ length: S.N }, (_, r) => Array.from({ length: S.N }, () => f(r)));
+  S.dice = grid(rollFace);
+  S.turns = grid(d6);
+  S.inverts = grid(d6);
+  S.spins = grid(d6);
+  S.g = { twist: d6(), beat: d6(), ringA: [d6(), d6()], ringB: [d6(), d6()], screen: d6() };
+  S.rolls++;
+  panels.forEach(pn => pn.rebuild && pn.rebuild());
+  updateLabels();
+}
+
+// ---- tiles (same geometry as sketch.js, bandRatio 0.5) ----
+function drawTile(g, v, t, k, r, c, s, seeThrough) {
+  const ctx = g.drawingContext;
+  const inverted = k >= 4;
+  g.push();
+  g.translate(c * s, r * s);
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, s, s); ctx.clip();
+  g.noStroke();
+  if (!(seeThrough && !inverted)) { g.fill(inverted ? INK : PAPER); g.rect(0, 0, s, s); }
+  g.translate(s / 2, s / 2);
+  g.rotate(((t - 1) % 4) * HALF + QUARTER);
+  const D = s * Math.SQRT1_2, P = s * Math.SQRT2 / 6, W = P / 2;
+  const cut = seeThrough && inverted;
+  if (cut) g.erase(); else g.fill(inverted ? PAPER : INK);
+  for (let i = 0; i < v; i++) g.rect(-s, D - i * P - W, 2 * s, W);
+  if (cut) g.noErase();
+  ctx.restore();
+  g.pop();
+}
+function drawDotTile(g, v, t, k, r, c, s) {
+  const ctx = g.drawingContext, q = s / 6, inverted = k >= 4;
+  g.push();
+  g.translate(c * s, r * s);
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, s, s); ctx.clip();
+  g.noStroke();
+  g.fill(inverted ? INK : PAPER); g.rect(0, 0, s, s);
+  g.fill(inverted ? PAPER : INK);
+  const d = q * (0.24 + 0.12 * v);
+  for (let j = 0; j < 6; j++)
+    for (let i = -1; i <= 6; i++) {
+      const shift = t % 2 === 0 && j % 2 ? 0.5 : 0;
+      g.circle((i + 0.5 + shift) * q, (j + 0.5) * q, d);
+    }
+  ctx.restore();
+  g.pop();
+}
+function buildLayer(p, kind, old) {
+  if (old) old.remove();
+  const g = p.createGraphics(p.width, p.height);
+  if (kind === 'clear') g.clear(); else g.background(PAPER);
+  const s = p.width / S.N;
+  for (let r = 0; r < S.N; r++)
+    for (let c = 0; c < S.N; c++) {
+      const a = [S.dice[r][c], S.turns[r][c], S.inverts[r][c], r, c, s];
+      if (kind === 'dots') drawDotTile(g, ...a);
+      else drawTile(g, ...a, kind === 'clear');
+    }
+  return g;
+}
+
+// ---- overlays (instance-mode versions of the snippets) ----
+const geo = p => { const s = p.width / S.N, P = s * Math.SQRT2 / 6; return { s, P, W: P / 2 }; };
+function diff(p) { p.blendMode(p.DIFFERENCE); p.fill(255); p.noStroke(); }
+
+const DRAW = {
+  twin(p, L, t) {
+    p.image(L.solid, 0, 0);
+    const twist = (S.g.twist * Math.PI / 180) * Math.sin(t * 0.35);
+    const zoom = 1 + 0.004 * S.g.twist * Math.sin(t * 0.23 + 1);
+    p.push();
+    p.translate(p.width / 2, p.height / 2); p.rotate(twist); p.scale(zoom);
+    p.translate(-p.width / 2, -p.height / 2);
+    p.image(L.clear, 0, 0);
+    p.pop();
+  },
+  turn(p, L, t) {
+    p.image(L.solid, 0, 0);
+    const { s, P, W } = geo(p);
+    diff(p);
+    for (let r = 0; r < S.N; r++)
+      for (let c = 0; c < S.N; c++) {
+        const dir = S.turns[r][c] % 2 ? 1 : -1;
+        const start = ((S.turns[r][c] - 1) % 4) * HALF + QUARTER + 0.15;
+        p.push();
+        p.drawingContext.save(); p.drawingContext.beginPath();
+        p.drawingContext.rect(c * s, r * s, s, s); p.drawingContext.clip();
+        p.translate((c + 0.5) * s, (r + 0.5) * s);
+        p.rotate(start + dir * (S.spins[r][c] * 3 * Math.PI / 180) * t);
+        for (let k = -4; k <= 4; k++) p.rect(-s, k * P - W / 2, 2 * s, W);
+        p.drawingContext.restore();
+        p.pop();
+      }
+    p.blendMode(p.BLEND);
+  },
+  beat(p, L, t) {
+    p.image(L.solid, 0, 0);
+    const { P } = geo(p);
+    const Pb = P * (1 + S.g.beat / (6 * S.N)), Wb = Pb / 2, R = p.width * 0.75;
+    const phase = (t * P * 0.08) % Pb;
+    p.push();
+    p.translate(p.width / 2, p.height / 2); p.rotate(QUARTER);
+    diff(p);
+    const n = Math.ceil(R / Pb) + 1;
+    for (let k = -n; k <= n; k++) p.rect(-R, k * Pb + phase - Wb / 2, 2 * R, Wb);
+    p.blendMode(p.BLEND);
+    p.pop();
+  },
+  dec(p, L, t) {
+    p.image(L.solid, 0, 0);
+    const { P, W } = geo(p);
+    const phase = W * (1 - Math.cos(t * 0.7));
+    const R = p.width * 1.5;
+    p.push();
+    p.rotate(QUARTER);
+    diff(p);
+    const n = Math.ceil(R / P);
+    for (let k = -n; k <= n; k++) p.rect(-R, k * P + phase - W, 2 * R, W);
+    p.blendMode(p.BLEND);
+    p.pop();
+  },
+  ring(p, L, t) {
+    p.image(L.solid, 0, 0);
+    const { s, P, W } = geo(p);
+    const R = Math.hypot(p.width, p.height) + P;
+    p.blendMode(p.DIFFERENCE); p.noFill(); p.stroke(255); p.strokeWeight(W);
+    [S.g.ringA, S.g.ringB].forEach(([dc, dr], i) => {
+      const x = (Math.floor((dc - 1) / 6 * S.N) + 0.5) * s;
+      const y = (Math.floor((dr - 1) / 6 * S.N) + 0.5) * s;
+      const drift = (i ? -1 : 1) * t * P * 0.3;
+      for (let rad = ((drift % P) + P) % P; rad < R; rad += P) p.circle(x, y, rad * 2);
+    });
+    p.blendMode(p.BLEND); p.noStroke();
+  },
+  dot(p, L, t) {
+    p.image(L.dots, 0, 0);
+    const q = p.width / S.N / 6;
+    const a = ((1 + S.g.screen * 1.5) * Math.PI / 180) * Math.sin(t * 0.3);
+    p.push();
+    p.translate(p.width / 2, p.height / 2); p.rotate(a);
+    diff(p);
+    const n = Math.ceil(p.width * 0.75 / q);
+    for (let j = -n; j <= n; j++)
+      for (let i = -n; i <= n; i++) p.circle((i + 0.5) * q, (j + 0.5) * q, q * 0.55);
+    p.blendMode(p.BLEND);
+    p.pop();
+  },
+};
+const LAYERS = { twin: ['solid', 'clear'], turn: ['solid'], beat: ['solid'], dec: ['solid'], ring: ['solid'], dot: ['dots'] };
+
+const panels = [];
+function makePanel(key) {
+  const el = document.getElementById('p-' + key);
+  const panel = { key };
+  panel.p = new p5(p => {
+    const L = {};
+    let t = 0;
+    const size = () => Math.max(160, Math.floor(Math.min(el.clientWidth || 420, 520)));
+    panel.rebuild = () => {
+      if (!p.width) return;
+      LAYERS[key].forEach(k => { L[k] = buildLayer(p, k, L[k]); });
+      p.redraw();
+    };
+    p.setup = () => {
+      p.pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      p.createCanvas(size(), size()).parent(el);
+      panel.rebuild();
+      if (!S.playing) p.noLoop();
+    };
+    p.draw = () => {
+      if (!L[LAYERS[key][0]]) return;
+      if (S.playing) t += Math.min(p.deltaTime, 100) / 1000;
+      p.background(PAPER);
+      DRAW[key](p, L, reduced && !S.playing ? 0.8 : t);
+    };
+    p.windowResized = () => {
+      const n = size();
+      if (n !== p.width) { p.resizeCanvas(n, n); panel.rebuild(); }
+    };
+  });
+  panels.push(panel);
+}
+
+function updateLabels() {
+  const g = S.g, f = d => `${FACES[d]} ${d}`;
+  const set = (id, txt) => { document.getElementById(id).textContent = txt; };
+  set('u-twin', `Twist die ${f(g.twist)} → up to ±${g.twist}°`);
+  const spinCounts = [1, 2, 3, 4, 5, 6].map(v => S.spins.flat().filter(x => x === v).length);
+  set('u-turn', `Spin die per cell (×3°/s) · counts ${spinCounts.map((n, i) => `${i + 1}:${n}`).join(' ')}`);
+  set('u-beat', `Beat die ${f(g.beat)} → about ${g.beat} fringe${g.beat > 1 ? 's' : ''} across the diagonal`);
+  const t15 = S.turns.flat().filter(v => (v - 1) % 4 === 0).length, t3 = S.turns.flat().filter(v => v === 3).length;
+  set('u-dec', `Reads turn dice · ${t15} tiles turned 1/5, ${t3} turned 3, ${S.N * S.N - t15 - t3} crossways`);
+  set('u-ring', `Ring A ${f(g.ringA[0])}, ${f(g.ringA[1])} · Ring B ${f(g.ringB[0])}, ${f(g.ringB[1])} (column, row)`);
+  set('u-dot', `Screen die ${f(g.screen)} → twists up to ±${(1 + g.screen * 1.5).toFixed(1)}°`);
+  document.getElementById('tally').textContent =
+    `Roll ${S.rolls} · ${S.N * S.N} cells · ${S.N * S.N * 4 + 7} dice`;
+}
+
+// snippets into <pre>
+['twin', 'turn', 'beat', 'dec', 'ring', 'dot'].forEach(k => {
+  document.getElementById('c-' + k).textContent = document.getElementById('s-' + k).textContent.trim();
+});
+document.querySelectorAll('.copy').forEach(b => b.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(document.getElementById(b.dataset.for).textContent);
+    b.textContent = 'Copied';
+  } catch (e) { b.textContent = 'Select and copy'; }
+  setTimeout(() => (b.textContent = 'Copy'), 1500);
+}));
+
+document.getElementById('roll').addEventListener('click', rollAll);
+document.getElementById('size').addEventListener('change', e => { S.N = +e.target.value; rollAll(); });
+const playBtn = document.getElementById('play');
+playBtn.textContent = S.playing ? 'Pause' : 'Play';
+playBtn.addEventListener('click', () => {
+  S.playing = !S.playing;
+  playBtn.textContent = S.playing ? 'Pause' : 'Play';
+  panels.forEach(pn => (S.playing ? pn.p.loop() : pn.p.noLoop()));
+});
+document.addEventListener('keydown', e => {
+  if ((e.key === ' ' || e.key === 'r' || e.key === 'R') && !/INPUT|SELECT|BUTTON|SUMMARY/.test(e.target.tagName)) {
+    e.preventDefault(); rollAll();
+  }
+});
+
+rollAll();
+['twin', 'turn', 'beat', 'dec', 'ring', 'dot'].forEach(makePanel);
+</script>
+</body>
+</html>

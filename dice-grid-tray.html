@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dice Grid — Dice on the Table</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+:root {
+  --bg: #F6F7F9; --fg: #17181C; --muted: #5E6270; --line: #D7DAE0;
+  --accent: #1F3A93; --surface: #FFFFFF; --warn: #E4572E;
+  --display: "Space Grotesk", system-ui, sans-serif;
+  --body: "Inter", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #121318; --fg: #ECEEF1; --muted: #9A9FAD; --line: #2B2E37;
+  --accent: #8EA6F0; --surface: #1B1D24; color-scheme: dark } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--body); }
+.wrap { max-width: 1200px; margin: 0 auto; padding: 28px 16px 48px; display: grid; gap: 18px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: 1.9rem; margin: 0; letter-spacing: -0.01em; }
+h2 { font-family: var(--display); font-weight: 500; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 10px 0 0; }
+.lede { margin: 4px 0 0; color: var(--muted); line-height: 1.55; max-width: 72ch; }
+/* grid and tray side by side, each at true size; wrap when the window is too narrow */
+.stages { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.stages figure { margin: 0; display: grid; gap: 8px; max-width: 100%; }
+.stages figcaption { font-family: var(--display); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+/* true scale: the canvases are never stretched; scroll if bigger than the window */
+#stage, .tray-box { overflow: auto; max-width: 100%; }
+#stage canvas, #tray { display: block; }
+#tray { cursor: grab; touch-action: none; border-radius: 2px; }
+#tray:active { cursor: grabbing; }
+#tray:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+button { font: 500 0.95rem var(--body); background: var(--accent); color: var(--bg); border: 0;
+  padding: 10px 18px; border-radius: 6px; cursor: pointer; }
+#throw { min-width: 10.5em; }
+button:disabled { opacity: 0.55; cursor: default; }
+button.ghost { background: transparent; color: var(--fg); box-shadow: inset 0 0 0 1px var(--line); padding: 7px 14px; font-size: 0.85rem; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+label { display: inline-flex; gap: 8px; align-items: center; color: var(--muted); font-size: 0.9rem; }
+input[type=range] { accent-color: var(--accent); width: 140px; }
+select { font: inherit; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+.tally, .mono { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+#landing { font-family: var(--mono); font-size: 0.85rem; color: var(--fg); min-height: 1.3em; font-variant-numeric: tabular-nums; }
+#log { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-family: var(--mono); font-size: 0.78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid; gap: 12px; }
+.panel p { margin: 0; line-height: 1.5; font-size: 0.92rem; }
+.preview-note { color: var(--warn); font-size: 0.85rem; }
+#card { border: 2px dashed var(--accent); border-radius: 3.2mm; display: grid; place-items: center;
+  color: var(--muted); font-size: 0.85rem; text-align: center; padding: 8px; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 0; }
+.facts div { border-left: 2px solid var(--line); padding-left: 10px; }
+.facts dt { font-size: 0.78rem; color: var(--muted); }
+.facts dd { margin: 2px 0 0; font-family: var(--mono); font-size: 0.95rem; }
+#overlay-thumb svg { width: 160px; height: 160px; display: block; }
+.row { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+.key { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; font-size: 0.85rem; max-width: 640px; }
+@media (max-width: 520px) { .key { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.key li { display: grid; gap: 6px; min-width: 0; }
+.face { aspect-ratio: 1; border-radius: 3px; overflow: hidden; box-shadow: 0 0 0 1px var(--line); }
+.key b { font-family: var(--mono); font-weight: 400; color: var(--muted); }
+ol { margin: 0; padding-left: 20px; line-height: 1.6; font-size: 0.92rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Dice Grid · dice on the table</h1>
+    <p class="lede">Throw the dice into the tray. The tray is the same size as the grid and split into the same cells, and wherever the <b>white</b> die comes to rest picks the one cell that changes. Instead of pips it shows bands: its face is the tile that cell will get, with the same number of bands starting from the same corner, and it turns as the die turns. How far it sits off square sets the tilt: a die lying a little crooked gives a slightly tilted tile (up to ±7.5°, while Tilt is on). The <b>grey</b> die shows a colour sample instead of pips: whichever way up it lands, light ground with a dark band or dark ground with a light band, is how that cell is coloured. Where it lands doesn't matter. Throw with the button or Space, or press in the tray and flick.</p>
+  </header>
+
+  <div class="stages">
+    <figure>
+      <figcaption>Grid</figcaption>
+      <div id="stage"></div>
+    </figure>
+    <figure>
+      <figcaption>Dice tray</figcaption>
+      <div class="tray-box"><canvas id="tray" tabindex="0" aria-label="Dice tray. Press Enter or Space to throw the dice; drag to flick them."></canvas></div>
+      <div id="landing" aria-live="polite"></div>
+    </figure>
+  </div>
+
+  <div class="controls">
+    <button id="throw" type="button">Throw the dice</button>
+    <button class="ghost" id="roll" type="button">Roll every cell</button>
+    <button class="ghost" id="clear" type="button">Clear grid</button>
+    <label for="size">Grid
+      <select id="size">
+        <option value="3">3 × 3</option><option value="4">4 × 4</option><option value="5">5 × 5</option>
+        <option value="6" selected>6 × 6</option><option value="8">8 × 8</option><option value="10">10 × 10</option>
+      </select>
+    </label>
+    <label for="tilt"><input id="tilt" type="checkbox" checked> Tilt</label>
+    <label for="show"><input id="show" type="checkbox"> Show dice</label>
+    <label for="pivot"><input id="pivot" type="checkbox"> Pivot mark</label>
+  </div>
+  <div class="panel" id="pivot-panel" hidden>
+    <div class="row">
+      <label for="pivot-x">Pivot X <input id="pivot-x" type="range" step="0.5"> <span class="mono" id="pivot-x-out"></span></label>
+      <label for="pivot-y">Pivot Y <input id="pivot-y" type="range" step="0.5"> <span class="mono" id="pivot-y-out"></span></label>
+      <button class="ghost" id="pivot-centre" type="button">Centre</button>
+    </div>
+    <p>Drag the mark on the grid, or use the sliders. Distances are from the grid's centre in real millimetres (+X right, +Y down). It snaps to cell corners and centres; hold Alt to place it freely. The preview disc turns around this point, and the disc size below grows to keep the whole grid covered.</p>
+  </div>
+  <div class="tally" id="tally"></div>
+  <ul id="log" aria-label="Recent throws"></ul>
+
+  <div class="panel">
+    <div class="row">
+      <label for="preview"><input id="preview" type="checkbox"> Preview disc on screen</label>
+      <label for="spin">Spin <input id="spin" type="range" min="0" max="30" step="0.5" value="4"> <span class="mono" id="spin-out">4°/s</span></label>
+    </div>
+    <p class="preview-note">Preview only: a simulation of the printed disc for trying rolls without it. Turn it off when the real disc is on the screen.</p>
+  </div>
+
+  <h2>1 · Calibrate this screen</h2>
+  <div class="panel">
+    <p>Hold any bank or ID card flat against the screen and drag the slider until the dashed box is exactly the card's size. Keep the browser zoom at 100% (and the same as when you calibrated). The setting is saved in this browser.</p>
+    <div id="card">Standard card<br>85.6 × 54 mm</div>
+    <div class="row">
+      <label for="cal">Scale <input id="cal" type="range" min="2" max="8" step="0.005"></label>
+      <span class="mono" id="cal-out"></span>
+      <button class="ghost" id="cal-reset" type="button">Reset</button>
+    </div>
+  </div>
+
+  <h2>2 · Print the disc</h2>
+  <div class="panel">
+    <dl class="facts">
+      <div><dt>Line pitch</dt><dd id="f-pitch"></dd></div>
+      <div><dt>Line width</dt><dd id="f-line"></dd></div>
+      <div><dt>Tile side</dt><dd id="f-tile"></dd></div>
+      <div><dt>Grid side</dt><dd id="f-grid"></dd></div>
+      <div><dt>Disc ⌀ (covers grid)</dt><dd id="f-disc"></dd></div>
+    </dl>
+    <div class="row">
+      <div id="overlay-thumb"></div>
+      <ol>
+        <li>Print the overlay PDF at <b>100% / actual size</b> on laser transparency film.</li>
+        <li>Check the scale bar: 10 lines should span exactly 10 × the pitch.</li>
+        <li>Cut out the disc and pierce the clear centre mark for the pivot.</li>
+        <li>Turn on <i>Pivot mark</i>, move it to where the disc will turn if needed, line the disc's centre up with it, then turn the mark off.</li>
+      </ol>
+    </div>
+    <div class="row">
+      <button class="ghost" id="copy-svg" type="button">Copy disc SVG (current grid size)</button>
+      <span class="mono" id="copy-out"></span>
+    </div>
+  </div>
+
+  <h2>Face key</h2>
+  <ul class="key">
+    <li><div class="face" id="face-1"></div><span><b>1</b> One band</span></li>
+    <li><div class="face" id="face-2"></div><span><b>2</b> Two bands</span></li>
+    <li><div class="face" id="face-3"></div><span><b>3</b> Three bands</span></li>
+    <li><div class="face" id="face-4"></div><span><b>4</b> Four bands</span></li>
+    <li><div class="face" id="face-5"></div><span><b>5</b> Five bands</span></li>
+    <li><div class="face" id="face-6"></div><span><b>6</b> Six bands</span></li>
+  </ul>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+<script>
+// Dice Grid — p5.js sketch for the Generative Art project
+// ONE DIE AT A TIME VERSION (10 Nov 2026), built on the physical overlay version
+//
+// The grid is shown on a screen and stays still between throws. A real disc
+// of straight black lines, printed on clear film, turns over the screen, and
+// the grid's band spacing is locked to the disc's line pitch in real mm.
+//
+// Each cell of an N×N grid is driven by dice (1–6):
+//   • FACE die: number of bands, stacked from one corner.
+//   • TURN die: which corner (1/5 bottom-left, 2/6 top-left,
+//       3 top-right, 4 bottom-right).
+//   • INVERT die: 1–3 → dark bands on light, 4–6 → light bands on dark.
+//   • TILT (optional): tilts the cell's bands by a smooth angle, ±TILT_MAX°,
+//       taken from how far the face die lies off square.
+//
+// Throwing the dice into the tray (see the script below): where the FACE die
+// lands picks one cell; that cell takes FACE, TURN and TILT from it, and INVERT
+// from the invert die. "Roll every cell" still sets every cell at once, with
+// the row-weighted face and a random smooth tilt.
+// A face of 0 is an empty cell (used by "Clear grid").
+
+// ---- physical setup -------------------------------------------------------
+const BAND_PITCH_MM = 5;
+const DISC_LINE_RATIO = 0.5;  // printed line width ÷ pitch (fixed on the film)
+
+const NOMINAL_PX_PER_MM = 96 / 25.4;
+let pxPerMm = loadCalibration();
+
+function loadCalibration() {
+  try {
+    const v = parseFloat(localStorage.getItem('diceGrid.pxPerMm'));
+    if (v > 1 && v < 20) return v;
+  } catch (e) {}
+  return NOMINAL_PX_PER_MM;
+}
+function setCalibration(v) {
+  pxPerMm = v;
+  try { localStorage.setItem('diceGrid.pxPerMm', String(v)); } catch (e) {}
+  sizeCanvas();
+}
+function cellPx() { return (6 * BAND_PITCH_MM / Math.SQRT2) * pxPerMm; }
+function cellMm() { return 6 * BAND_PITCH_MM / Math.SQRT2; }
+function gridMm() { return N * cellMm(); }
+// Smallest disc that covers the whole grid when pivoted on the pivot point
+// (the far corner sets the radius), plus a margin for handling
+function discDiameterMm(marginMm = 10) {
+  const h = gridMm() / 2;
+  return 2 * Math.hypot(h + Math.abs(pivotMm.x), h + Math.abs(pivotMm.y)) + 2 * marginMm;
+}
+
+// ---- pivot ----------------------------------------------------------------
+// Where the disc turns, as an offset in real mm from the grid's centre
+// (+x right, +y down). Kept in mm so it stays put through calibration
+// changes; saved in this browser. Limited to the grid so the mark is visible.
+let pivotMm = loadPivot();
+function loadPivot() {
+  try {
+    const v = JSON.parse(localStorage.getItem('diceGrid.pivotMm'));
+    if (v && isFinite(v.x) && isFinite(v.y)) return { x: v.x, y: v.y };
+  } catch (e) {}
+  return { x: 0, y: 0 };
+}
+function clampPivot() {
+  const h = gridMm() / 2;
+  pivotMm.x = Math.max(-h, Math.min(h, pivotMm.x));
+  pivotMm.y = Math.max(-h, Math.min(h, pivotMm.y));
+}
+function setPivot(xMm, yMm) {
+  pivotMm = { x: Math.round(xMm * 10) / 10, y: Math.round(yMm * 10) / 10 };
+  clampPivot();
+  try { localStorage.setItem('diceGrid.pivotMm', JSON.stringify(pivotMm)); } catch (e) {}
+  redraw();
+  if (typeof onPivot === 'function') onPivot();
+}
+// pivot in canvas px
+function pivotPx() { return { x: width / 2 + pivotMm.x * pxPerMm, y: height / 2 + pivotMm.y * pxPerMm }; }
+
+// ---- state ----------------------------------------------------------------
+let N = 6;
+let dice = [];             // face die:   dice[row][col]    = 0..6 (0 = empty)
+let turns = [];            // turn die:   turns[row][col]   = 1..6
+let inverts = [];          // invert die: inverts[row][col] = 1..6
+let tilts = [];            // tilt:       tilts[row][col]   = degrees, −TILT_MAX..+TILT_MAX
+let tiltOn = true;
+const TILT_MAX = 7.5;      // die lying 45° off square → full tilt
+let showDice = false;
+let pivotMark = false;
+let rollCount = 0;
+
+let previewOn = false;
+let previewSpin = 4;
+let previewAngle = 0.12;
+
+const PAPER = '#ECEEF1';
+const INK = '#1B1B1E';
+
+let gridLayer;
+
+// ---- setup / sizing -------------------------------------------------------
+function setup() {
+  const c = createCanvas(10, 10);
+  c.parent('stage');
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) previewSpin = 0;
+  drawFaceKey();
+  rollDice();
+}
+
+function sizeCanvas() {
+  const px = Math.round(N * cellPx());
+  if (px !== width || px !== height) resizeCanvas(px, px);
+  buildGrid();
+  applyLoop();
+  if (typeof onResized === 'function') onResized();
+}
+
+function applyLoop() {
+  if (previewOn && previewSpin > 0) loop();
+  else { noLoop(); redraw(); }
+}
+
+function setPreview(on) { previewOn = on; applyLoop(); }
+function setPreviewSpin(degPerSec) { previewSpin = degPerSec; applyLoop(); }
+function setShowDice(on) { showDice = on; redraw(); }
+function setPivotMark(on) { pivotMark = on; redraw(); }
+function setTilt(on) { tiltOn = on; buildGrid(); redraw(); }
+
+// ---- dice -----------------------------------------------------------------
+function rollDice() {
+  dice = []; turns = []; inverts = []; tilts = [];
+  for (let r = 0; r < N; r++) {
+    const f = [], t = [], k = [], l = [];
+    for (let c = 0; c < N; c++) {
+      f.push(rollFace(r));
+      t.push(floor(random(1, 7)));
+      k.push(floor(random(1, 7)));
+      l.push(random(-TILT_MAX, TILT_MAX));
+    }
+    dice.push(f); turns.push(t); inverts.push(k); tilts.push(l);
+  }
+  rollCount++;
+  sizeCanvas();
+  if (typeof onRolled === 'function') onRolled(dice, turns, inverts, tilts, rollCount);
+}
+
+// Empty grid: no bands, light ground everywhere. Single throws then fill it in.
+function clearGrid() {
+  dice = []; turns = []; inverts = []; tilts = [];
+  for (let r = 0; r < N; r++) {
+    dice.push(new Array(N).fill(0)); turns.push(new Array(N).fill(1));
+    inverts.push(new Array(N).fill(1)); tilts.push(new Array(N).fill(0));
+  }
+  sizeCanvas();
+  if (typeof onRolled === 'function') onRolled(dice, turns, inverts, tilts, rollCount);
+}
+
+// A throw has landed: each die changes one setting of the cell it lies in.
+// changes = [{ r, c, kind: 'face' | 'invert', value, turn?, tilt? }]
+// Every changed cell fades its old tile out to bare paper, then fades the
+// new tile in. Cells nothing landed on are untouched.
+const FADE_MS = 1400;      // whole change: first half out, second half in
+let fades = [];            // [{ x, y, w, oldImg, newImg, start }]
+
+function applyThrow(changes) {
+  const s = width / N, cells = new Map();
+  for (const ch of changes) {
+    const k = ch.r * N + ch.c;
+    if (cells.has(k)) continue;
+    const x = Math.round(ch.c * s), y = Math.round(ch.r * s), w = Math.round(s);
+    cells.set(k, { x, y, w, oldImg: gridLayer.get(x, y, w, w) });
+  }
+  for (const ch of changes) {
+    if (ch.kind === 'face') { dice[ch.r][ch.c] = ch.value; turns[ch.r][ch.c] = ch.turn; tilts[ch.r][ch.c] = ch.tilt; }
+    else if (ch.kind === 'invert') inverts[ch.r][ch.c] = ch.value;
+  }
+  buildGrid();
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) { redraw(); return; }
+  const start = millis();
+  fades = [...cells.values()].map(f => ({ ...f, newImg: gridLayer.get(f.x, f.y, f.w, f.w), start }));
+  const f0 = fades[0];
+  ping = { x: f0.x, y: f0.y, w: f0.w, start };
+  loop();
+}
+
+// Attention flash: the whole changing cell blinks warm twice while the old
+// tile fades out. A filled area survives the disc's black lines far better
+// than a thin outline, and the blink in time catches the eye through them.
+// It stays strictly inside the cell.
+const PING_MS = 700;
+let ping = null;
+function drawPing() {
+  const t = (millis() - ping.start) / PING_MS;
+  if (t >= 1) { ping = null; return; }
+  const a = Math.pow(Math.sin(t * Math.PI * 2), 2);   // two pulses
+  push();
+  noStroke();
+  fill(228, 87, 46, 215 * a);
+  rect(ping.x, ping.y, ping.w, ping.w);
+  pop();
+}
+
+function drawFades() {
+  const t = (millis() - fades[0].start) / FADE_MS;
+  if (t >= 1) { fades = []; applyLoop(); return; }
+  const ease = u => u * u * (3 - 2 * u);
+  push();
+  noStroke();
+  for (const f of fades) {
+    noTint(); fill(PAPER);
+    rect(f.x, f.y, f.w, f.w);
+    if (t < 0.5) { tint(255, 255 * (1 - ease(t * 2))); image(f.oldImg, f.x, f.y, f.w, f.w); }
+    else         { tint(255, 255 * ease(t * 2 - 1));   image(f.newImg, f.x, f.y, f.w, f.w); }
+  }
+  pop();
+}
+
+const HOME_FACE_CHANCE = 0.75;
+function rowFace(r) { return (r % 6) + 1; }
+function rollFace(r) {
+  const home = rowFace(r);
+  if (random() < HOME_FACE_CHANCE) return home;
+  return random([1, 2, 3, 4, 5, 6].filter(f => f !== home));
+}
+
+function setGridSize(n) { N = n; rollDice(); }
+
+// ---- drawing --------------------------------------------------------------
+function buildGrid() {
+  fades = [];              // any full redraw cancels fades in progress
+  ping = null;
+  if (!gridLayer || gridLayer.width !== width || gridLayer.height !== height) {
+    if (gridLayer) gridLayer.remove();
+    gridLayer = createGraphics(width, height);
+  }
+  gridLayer.background(PAPER);
+  const cell = width / N;
+  for (let r = 0; r < N; r++)
+    for (let c = 0; c < N; c++)
+      drawTile(dice[r][c], turns[r][c], inverts[r][c], r, c, cell, gridLayer,
+               tiltOn ? tilts[r][c] : 0);
+}
+
+function draw() {
+  if (!gridLayer) return;
+  image(gridLayer, 0, 0, width, height);
+  if (fades.length) drawFades();
+  if (ping) drawPing();
+
+  if (previewOn) {
+    drawPreviewDisc(previewAngle);
+    previewAngle += radians(previewSpin) * (deltaTime / 1000);
+  }
+
+  if (showDice) {
+    const cell = width / N;
+    for (let r = 0; r < N; r++)
+      for (let c = 0; c < N; c++) {
+        drawDie(dice[r][c], c * cell, r * cell, cell, 'face');
+        drawDie(inverts[r][c], c * cell, r * cell, cell, 'invert');
+        drawDie(turns[r][c], c * cell, r * cell, cell, 'turn');
+        if (tiltOn && Math.abs(tilts[r][c]) >= 0.05) {           // tilt in degrees, bottom-left
+          push(); stroke(255); strokeWeight(3); strokeJoin(ROUND); fill('#E4572E'); textSize(max(9, cell * 0.12)); textAlign(LEFT, BOTTOM);
+          text((tilts[r][c] > 0 ? '+' : '−') + Math.abs(tilts[r][c]).toFixed(1) + '°', c * cell + cell * 0.05, r * cell + cell * 0.95);
+          pop();
+        }
+      }
+  }
+
+
+  if (pivotMark) {
+    const a = cellPx() * 0.18, pv = pivotPx();
+    push();
+    // a light halo first so the mark shows on dark tiles too
+    noFill();
+    stroke(255, 200); strokeWeight(4);
+    line(pv.x - a, pv.y, pv.x + a, pv.y); line(pv.x, pv.y - a, pv.x, pv.y + a); circle(pv.x, pv.y, a);
+    stroke('#E4572E'); strokeWeight(1.5);
+    line(pv.x - a, pv.y, pv.x + a, pv.y); line(pv.x, pv.y - a, pv.x, pv.y + a); circle(pv.x, pv.y, a);
+    pop();
+  }
+}
+
+function drawPreviewDisc(angle) {
+  const P = BAND_PITCH_MM * pxPerMm;
+  const W = P * DISC_LINE_RATIO;
+  const pv = pivotPx();
+  const R = Math.hypot(Math.max(pv.x, width - pv.x), Math.max(pv.y, height - pv.y));
+  push();
+  translate(pv.x, pv.y);
+  rotate(angle);
+  noStroke();
+  fill(0);
+  const n = ceil(R / P) + 1;
+  for (let k = -n; k <= n; k++) rect(-R, k * P - W / 2, 2 * R, W);
+  pop();
+}
+
+function bandSpacing(s) { return (s * Math.SQRT2) / 6; }
+function bandWidth(s) { return bandSpacing(s) * bandRatio; }
+let bandRatio = 0.5;
+function setBandRatio(f) { bandRatio = f; buildGrid(); drawFaceKey(true); redraw(); }
+
+function drawTile(v, t, k, r, c, s, g, tiltDeg = 0) {
+  const p = g || window;
+  const ctx = g ? g.drawingContext : drawingContext;
+  const h = s / 2;
+  const inverted = k >= 4;
+  const ground = inverted ? INK : PAPER;
+  const band = inverted ? PAPER : INK;
+
+  p.push();
+  p.translate(c * s, r * s);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, s, s);
+  ctx.clip();
+
+  p.noStroke();
+  p.fill(ground);
+  p.rect(0, 0, s, s);
+
+  p.translate(h, h);
+  // turn die: 1 or 5 → bottom-left, 2 or 6 → top-left, 3 → top-right, 4 → bottom-right
+  p.rotate(((t - 1) % 4) * HALF_PI);
+  p.rotate(QUARTER_PI);
+  if (tiltDeg) p.rotate(radians(tiltDeg));
+
+  const D = s * Math.SQRT1_2;
+  const W = bandWidth(s);
+  const P = bandSpacing(s);
+  p.fill(band);
+  for (let i = 0; i < v; i++) p.rect(-s, D - i * P - W, s * 2, W);
+
+  ctx.restore();
+  p.pop();
+}
+
+// ---- face key -------------------------------------------------------------
+const keyLayers = {};
+function drawFaceKey(refresh) {
+  for (let v = 1; v <= 6; v++) {
+    const slot = document.getElementById('face-' + v);
+    if (!slot) continue;
+    const size = 96;
+    if (refresh && keyLayers[v]) { keyLayers[v].clear(); drawTile(v, 1, 1, 0, 0, size, keyLayers[v]); continue; }
+    const pg = createGraphics(size, size);
+    keyLayers[v] = pg;
+    drawTile(v, 1, 1, 0, 0, size, pg);
+    pg.elt.style.display = 'block';
+    pg.elt.style.width = '100%';
+    pg.elt.style.height = 'auto';
+    slot.appendChild(pg.elt);
+  }
+}
+
+// ---- dice overlay ---------------------------------------------------------
+const PIPS = {
+  1: [[0, 0]],
+  2: [[-1, -1], [1, 1]],
+  3: [[-1, -1], [0, 0], [1, 1]],
+  4: [[-1, -1], [1, -1], [-1, 1], [1, 1]],
+  5: [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]],
+  6: [[-1, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]],
+};
+const DIE_STYLE = {
+  face:   { body: '#FFFFFF', pip: '#1B1B1E', edge: '#1B1B1E' },
+  invert: { body: '#8A8F99', pip: '#FFFFFF', edge: '#FFFFFF' },
+  turn:   { body: '#1B1B1E', pip: '#FFFFFF', edge: '#FFFFFF' },
+  tilt:   { body: '#E4572E', pip: '#FFFFFF', edge: '#FFFFFF' },
+};
+function drawDie(v, x, y, s, kind) {
+  if (!PIPS[v]) return;            // empty cell (face 0)
+  const d = s * 0.3, m = s * 0.05, st = DIE_STYLE[kind];
+  push();
+  const right = kind === 'turn' || kind === 'invert';
+  const bottom = kind === 'turn' || kind === 'tilt';
+  translate(right ? x + s - m - d / 2 : x + m + d / 2, bottom ? y + s - m - d / 2 : y + m + d / 2);
+  stroke(st.edge);
+  strokeWeight(max(1, s * 0.012));
+  fill(st.body);
+  rect(-d / 2, -d / 2, d, d, d * 0.2);
+  noStroke();
+  fill(st.pip);
+  for (const [px, py] of PIPS[v]) circle(px * d * 0.28, py * d * 0.28, d * 0.18);
+  pop();
+}
+
+function keyPressed() {
+  // Space: throw the dice · R: roll every cell
+  if (document.activeElement && /^(BUTTON|SELECT|INPUT)$/.test(document.activeElement.tagName) && key === ' ') return;
+  if (key === ' ') { throwDie(); return false; }
+  if (key === 'r' || key === 'R') { rollDice(); return false; }
+}
+</script>
+<script>
+const $ = id => document.getElementById(id);
+const mm = v => v.toFixed(1) + ' mm';
+const CORNER = { 1: 'bottom-left', 2: 'top-left', 3: 'top-right', 4: 'bottom-right' };
+
+function onRolled(d, t, k, l, n) {
+  const faces = d.flat();
+  const count = arr => [1,2,3,4,5,6].map(f => `${f}:${arr.filter(v => v === f).length}`).join(' ');
+  const empty = faces.filter(v => v === 0).length;
+  $('tally').textContent = `Full rolls ${n} · throws ${throwCount} · ${faces.length} cells` +
+    (empty ? ` · ${empty} empty` : '') + ` · ${k.flat().filter(v => v >= 4).length} inverted · faces ${count(faces)}`;
+}
+
+// =========================================================================
+// DICE TRAY
+// A top-down tray exactly the size of the grid, split into the same N×N
+// cells. Each throw puts the cell dice on the table together:
+//   • FACE die (white)  → picks the cell: the one under its centre when it
+//                         stops. Its face shows bands, not pips: the number
+//                         of bands is the FACE, and the corner they start
+//                         from, as the die lies, is the TURN. How far it
+//                         lies off square (−45°..+45° from the nearest
+//                         quarter turn) is the TILT, scaled to ±TILT_MAX°.
+//   • INVERT die (grey) → light (1–3) or dark (4–6) for that same cell; its
+//                         faces show the colour sample, not pips
+// Where the grey die lands doesn't matter, only its number.
+// The dice slide, knock into the walls and each other, and tumble. When the
+// last one stops, the one chosen cell changes and nothing else does.
+// =========================================================================
+const tray = $('tray');
+const tctx = tray.getContext('2d');
+const reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+const FELT = '#22433A';
+const TRAY_DIE = {
+  face:   { body: '#FAFAF6', pip: '#1B1B1E', edge: 'rgba(0,0,0,0.55)' },
+  invert: { body: '#8A8F99', pip: '#FFFFFF', edge: 'rgba(0,0,0,0.45)' },
+};
+
+let T = 0;              // tray side in CSS px (always equals the grid's)
+let trayN = 0;
+let tdice = [];         // [{ kind, x, y, z, vx, vy, vz, a, w, face, dist, moving }]
+let holding = false;    // dice are in the hand (pointer down)
+let drag = null;        // pointer samples while holding
+let hits = [];          // landings per cell, all dice
+let throwCount = 0;
+let landed = [];        // [{ kind, r, c }] from the last throw
+let raf = 0, lastTime = 0;
+const history = [];
+
+const dieSize = () => (T / N) * 0.5;
+const randFace = (not) => { let f; do { f = 1 + Math.floor(Math.random() * 6); } while (f === not); return f; };
+const kindsOnTable = () => ['face', 'invert'];
+const anyMoving = () => tdice.some(d => d.moving);
+
+function newDie(kind, x, y) {
+  const ds = dieSize();
+  return { kind, x, y, z: ds * 0.9, vx: 0, vy: 0, vz: 0, a: Math.random() * Math.PI * 2, w: 0,
+           face: randFace(), dist: 0, moving: false };
+}
+
+function sizeTray() {
+  const s = width;
+  const dpr = window.devicePixelRatio || 1;
+  if (T && s !== T) for (const d of tdice) { d.x *= s / T; d.y *= s / T; }
+  if (trayN !== N) { hits = new Array(N * N).fill(0); landed = []; tdice = []; trayN = N; }
+  T = s;
+  tray.width = Math.round(s * dpr); tray.height = Math.round(s * dpr);
+  tray.style.width = s + 'px'; tray.style.height = s + 'px';
+  $('landing').style.maxWidth = s + 'px';   // long results wrap under the tray
+  tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawTray();
+}
+
+// ---- throwing ----------------------------------------------------------
+function throwDie() {
+  if (anyMoving() || holding) return;
+  const ds = dieSize(), kinds = kindsOnTable();
+  if (reduceMotion) {                       // no animation: they just land
+    tdice = kinds.map(k => {
+      const d = newDie(k, ds + Math.random() * (T - 2 * ds), ds + Math.random() * (T - 2 * ds));
+      d.z = 0; return d;
+    });
+    separate(); land();
+    return;
+  }
+  // all dice leave the hand together from just inside one wall, aimed at a spot
+  const side = Math.floor(Math.random() * 4);
+  const along = T * (0.25 + Math.random() * 0.5);
+  const [x, y] = [[along, ds], [T - ds, along], [along, T - ds], [ds, along]][side];
+  const tx = T * (0.2 + Math.random() * 0.6), ty = T * (0.2 + Math.random() * 0.6);
+  const len = Math.hypot(tx - x, ty - y) || 1;
+  const ux = (tx - x) / len, uy = (ty - y) / len;
+  const speed = T * (1.1 + Math.random() * 1.4);
+  tdice = kinds.map((k, i) => {
+    const off = (i - (kinds.length - 1) / 2) * ds * 1.4;      // side by side across the throw
+    return newDie(k, x - uy * off, y + ux * off);
+  });
+  launchAll(ux * speed, uy * speed);
+}
+
+function launchAll(vx, vy) {
+  const ds = dieSize();
+  for (const d of tdice) {
+    const spread = 0.75 + Math.random() * 0.5, turn = (Math.random() - 0.5) * 0.5;
+    const c = Math.cos(turn), s = Math.sin(turn);
+    d.vx = (vx * c - vy * s) * spread; d.vy = (vx * s + vy * c) * spread;
+    d.z = ds * 0.9; d.vz = ds * 5 * (0.6 + Math.random() * 0.6);
+    d.w = (Math.random() - 0.5) * 24; d.face = randFace(); d.dist = 0; d.moving = true;
+  }
+  landed = [];
+  setThrowing(true);
+  startLoop();
+}
+
+function setThrowing(on) { $('throw').disabled = on; $('throw').textContent = on ? 'Rolling…' : 'Throw the dice'; }
+
+// ---- physics -----------------------------------------------------------
+function step(d, dt) {
+  const ds = dieSize();
+  const G = ds * 60;                         // gravity for the bounce height
+  if (d.z > 0 || d.vz > 0) {
+    d.vz -= G * dt; d.z += d.vz * dt;
+    if (d.z <= 0) {
+      d.z = 0;
+      if (-d.vz > ds * 1.2) {
+        d.vz = -d.vz * 0.45;
+        d.face = randFace(d.face);
+        d.w += (Math.random() - 0.5) * 14;
+      } else d.vz = 0;
+    }
+  }
+  d.x += d.vx * dt; d.y += d.vy * dt; d.a += d.w * dt;
+
+  // walls
+  const r = ds * 0.62;
+  const hitWall = (pos, vel, lo, hi) => {
+    if (pos < lo) return [lo, -vel * 0.6, true];
+    if (pos > hi) return [hi, -vel * 0.6, true];
+    return [pos, vel, false];
+  };
+  let hx, hy;
+  [d.x, d.vx, hx] = hitWall(d.x, d.vx, r, T - r);
+  [d.y, d.vy, hy] = hitWall(d.y, d.vy, r, T - r);
+  if (hx || hy) {
+    d.w += (Math.random() - 0.5) * 18;
+    if (Math.hypot(d.vx, d.vy) > T * 0.25) d.face = randFace(d.face);
+  }
+
+  // friction while touching the felt: rolling drag plus a steady slow-down
+  const speed = Math.hypot(d.vx, d.vy);
+  if (d.z === 0 && speed > 0) {
+    const decel = T * 0.9 + speed * 1.6;
+    const ns = Math.max(0, speed - decel * dt);
+    d.vx *= ns / speed; d.vy *= ns / speed;
+    d.dist += ns * dt;
+    if (ns > T * 0.35 && d.dist > ds * 1.3) { d.dist = 0; d.face = randFace(d.face); }
+  }
+  if (d.z === 0) {
+    const ws = Math.abs(d.w), nw = Math.max(0, ws - (2 + ws * 3.5) * dt);
+    d.w = ws ? d.w * nw / ws : 0;
+  }
+}
+
+// Dice knock into each other: treat each as a disc and bounce them apart.
+// A settled die that gets hit starts moving again.
+function collide() {
+  const minD = dieSize() * 1.15;
+  for (let i = 0; i < tdice.length; i++)
+    for (let j = i + 1; j < tdice.length; j++) {
+      const a = tdice[i], b = tdice[j];
+      const dx = b.x - a.x, dy = b.y - a.y, dist = Math.hypot(dx, dy);
+      if (dist >= minD || dist === 0) continue;
+      const nx = dx / dist, ny = dy / dist, push = (minD - dist) / 2;
+      a.x -= nx * push; a.y -= ny * push; b.x += nx * push; b.y += ny * push;
+      const rel = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+      if (rel < 0) {
+        const j2 = -rel * 0.85;               // fairly bouncy, like bone on bone
+        a.vx -= nx * j2; a.vy -= ny * j2; b.vx += nx * j2; b.vy += ny * j2;
+        a.w += (Math.random() - 0.5) * 10; b.w += (Math.random() - 0.5) * 10;
+        if (j2 > T * 0.3) { a.face = randFace(a.face); b.face = randFace(b.face); }
+        a.moving = b.moving = true;
+      }
+    }
+}
+
+// Push resting dice apart so none overlap (used when there is no animation)
+function separate() {
+  for (let k = 0; k < 20; k++) {
+    collide();
+    const r = dieSize() * 0.62;
+    for (const d of tdice) { d.vx = d.vy = d.w = 0; d.x = Math.min(T - r, Math.max(r, d.x)); d.y = Math.min(T - r, Math.max(r, d.y)); }
+  }
+  for (const d of tdice) d.moving = false;
+}
+
+function settleCheck(d) {
+  if (d.moving && d.z === 0 && d.vz === 0 && Math.hypot(d.vx, d.vy) < 4 && Math.abs(d.w) < 0.4) {
+    d.vx = d.vy = d.w = 0;
+    d.moving = false;
+  }
+}
+
+// ---- landing: each die updates one setting of one cell -------------------
+function cellOf(d) {
+  const cell = T / N;
+  return { c: Math.min(N - 1, Math.max(0, Math.floor(d.x / cell))),
+           r: Math.min(N - 1, Math.max(0, Math.floor(d.y / cell))) };
+}
+
+function land() {
+  // Only the FACE die's position matters: it picks the cell. The other dice
+  // are read for their numbers and all apply to that same cell.
+  const faceDie = tdice.find(d => d.kind === 'face');
+  const { r, c } = cellOf(faceDie);
+  hits[r * N + c]++;
+  landed = [{ r, c }];
+  // The die's rotation gives two things. The nearest quarter turn is the
+  // TURN: the bands' start corner is bottom-left at 0°, and each quarter turn
+  // clockwise moves it on one corner (1 BL, 2 TL, 3 TR, 4 BR). What's left
+  // over, −45°..+45° off square, is the TILT, scaled to ±TILT_MAX° and in the
+  // same direction the die leans.
+  const deg = faceDie.a * 180 / Math.PI;
+  const q = Math.round(deg / 90);
+  const turn = (((q % 4) + 4) % 4) + 1;
+  const tilt = ((deg - q * 90) / 45) * TILT_MAX;
+  const changes = [{ r, c, kind: 'face', value: faceDie.face, turn, tilt }];
+  const tiltTxt = (tilt > 0 ? '+' : tilt < 0 ? '−' : '') + Math.abs(tilt).toFixed(1) + '°' + (tiltOn ? '' : ' (off)');
+  const parts = [`face ${faceDie.face}, from ${CORNER[turn]}, tilt ${tiltTxt}`];
+  for (const d of tdice) {
+    if (d.kind === 'invert') {
+      changes.push({ r, c, kind: 'invert', value: d.face });
+      parts.push(`invert ${d.face} (${d.face >= 4 ? 'dark' : 'light'})`);
+    }
+  }
+  throwCount++;
+  applyThrow(changes);
+  const msg = `Throw ${throwCount} → row ${r + 1}, col ${c + 1} · ` + parts.join(' · ');
+  $('landing').textContent = msg;
+  history.unshift(msg);
+  history.length = Math.min(history.length, 8);
+  $('log').innerHTML = history.slice(1).map(m => `<li>${m}</li>`).join('');
+  onRolled(dice, turns, inverts, tilts, rollCount);
+  setThrowing(false);
+  drawTray();
+}
+
+// ---- animation loop ----------------------------------------------------
+function startLoop() {
+  if (raf) return;
+  lastTime = performance.now();
+  raf = requestAnimationFrame(tick);
+}
+function tick(now) {
+  const dt = Math.min(1 / 30, (now - lastTime) / 1000);
+  lastTime = now;
+  if (anyMoving()) {
+    // sub-steps keep fast throws from skipping through walls and each other
+    for (let k = 0; k < 3; k++) {
+      for (const d of tdice) if (d.moving) step(d, dt / 3);
+      collide();
+      for (const d of tdice) settleCheck(d);
+    }
+    if (!anyMoving()) land();
+  }
+  drawTray();
+  raf = (anyMoving() || holding) ? requestAnimationFrame(tick) : 0;
+}
+
+// ---- drawing the tray --------------------------------------------------
+function roundRectPath(ctx, x, y, w, h, rad) {
+  ctx.beginPath();
+  ctx.moveTo(x + rad, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rad);
+  ctx.arcTo(x + w, y + h, x, y + h, rad);
+  ctx.arcTo(x, y + h, x, y, rad);
+  ctx.arcTo(x, y, x + w, y, rad);
+  ctx.closePath();
+}
+
+function drawTray() {
+  if (!T) return;
+  const ctx = tctx, cell = T / N;
+  const resting = tdice.length && !anyMoving() && !holding;
+  ctx.clearRect(0, 0, T, T);
+  ctx.fillStyle = FELT;
+  ctx.fillRect(0, 0, T, T);
+
+  // the cells the last throw landed in
+  if (resting)
+    for (const l of landed) {
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.fillRect(l.c * cell, l.r * cell, cell, cell);
+    }
+
+  // cell lines, matching the grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 1; i < N; i++) {
+    const p = Math.round(i * cell) + 0.5;
+    ctx.moveTo(p, 0); ctx.lineTo(p, T);
+    ctx.moveTo(0, p); ctx.lineTo(T, p);
+  }
+  ctx.stroke();
+
+  // landings per cell
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.font = `${Math.max(9, cell * 0.13)}px "JetBrains Mono", ui-monospace, monospace`;
+  ctx.textBaseline = 'top';
+  for (let r = 0; r < N; r++)
+    for (let c = 0; c < N; c++)
+      if (hits[r * N + c]) ctx.fillText(hits[r * N + c], c * cell + 5, r * cell + 4);
+
+  // tray wall
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 4;
+  ctx.strokeRect(2, 2, T - 4, T - 4);
+
+  // lower dice first, so a die in the air is drawn over the others
+  for (const d of [...tdice].sort((a, b) => a.z - b.z)) drawTrayDie(d);
+
+  if (!tdice.length) {
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.font = `500 ${Math.max(12, T * 0.03)}px Inter, system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('Press Space, or drag here to flick the dice', T / 2, T / 2);
+    ctx.textAlign = 'start';
+  }
+}
+
+function drawTrayDie(d) {
+  const ctx = tctx, ds = dieSize(), h = ds / 2, st = TRAY_DIE[d.kind];
+  const lift = d.z / ds;                       // 0 on the felt
+  const sc = 1 + lift * 0.18;
+  ctx.save();
+  // shadow, pushed away as the die rises
+  ctx.save();
+  ctx.translate(d.x + ds * 0.08 + d.z * 0.35, d.y + ds * 0.1 + d.z * 0.35);
+  ctx.rotate(d.a);
+  ctx.fillStyle = `rgba(0,0,0,${0.38 - Math.min(0.2, lift * 0.08)})`;
+  roundRectPath(ctx, -h, -h, ds, ds, ds * 0.2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.translate(d.x, d.y);
+  ctx.scale(sc, sc);
+  ctx.rotate(d.a);
+  roundRectPath(ctx, -h, -h, ds, ds, ds * 0.2);
+  ctx.fillStyle = st.body;
+  ctx.fill();
+  ctx.strokeStyle = st.edge; ctx.lineWidth = 1;
+  roundRectPath(ctx, -h, -h, ds, ds, ds * 0.2);
+  ctx.stroke();
+  if (d.kind === 'face') drawBandFace(ctx, d.face, ds);
+  else drawInvertFace(ctx, d.face, ds);
+  ctx.restore();
+}
+
+// The FACE die shows bands instead of pips: a small copy of the tile it will
+// make, printed on its top face. Same geometry as drawTile with turn 1 (bands
+// stack from the face's bottom-left corner), so as the die turns, the start
+// corner turns with it, and the face it settles on is the tile the cell gets.
+function drawBandFace(ctx, v, ds) {
+  const s = ds * 0.86, hs = s / 2;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(-hs, -hs, s, s); ctx.clip();
+  ctx.fillStyle = PAPER; ctx.fillRect(-hs, -hs, s, s);
+  ctx.rotate(Math.PI / 4);
+  const D = s * Math.SQRT1_2, P = (s * Math.SQRT2) / 6, W = P * bandRatio;
+  ctx.fillStyle = INK;
+  for (let i = 0; i < v; i++) ctx.fillRect(-s, D - i * P - W, s * 2, W);
+  ctx.restore();
+  ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 0.75;
+  ctx.strokeRect(-hs, -hs, s, s);
+}
+
+// The INVERT die shows its result instead of pips: a colour sample of the
+// tile, ground plus one band. Faces 1–3 are light ground with a dark band,
+// faces 4–6 dark ground with a light band, so it flips as it tumbles.
+function drawInvertFace(ctx, v, ds) {
+  const s = ds * 0.86, hs = s / 2, dark = v >= 4;
+  const ground = dark ? INK : PAPER, band = dark ? PAPER : INK;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(-hs, -hs, s, s); ctx.clip();
+  ctx.fillStyle = ground; ctx.fillRect(-hs, -hs, s, s);
+  ctx.rotate(Math.PI / 4);
+  const W = ((s * Math.SQRT2) / 6) * bandRatio;      // same band width as a tile
+  ctx.fillStyle = band; ctx.fillRect(-s, -W / 2, s * 2, W);
+  ctx.restore();
+  ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 0.75;
+  ctx.strokeRect(-hs, -hs, s, s);
+}
+
+// ---- grab and flick ----------------------------------------------------
+// Press in the tray to scoop up all the dice, move to shake them, and let go
+// with a flick to throw. A tap just drops them with a small random toss.
+function trayPoint(e) {
+  const b = tray.getBoundingClientRect();
+  return { x: e.clientX - b.left, y: e.clientY - b.top, t: performance.now() };
+}
+function placeInHand(p) {
+  const ds = dieSize(), r = ds * 0.62, n = tdice.length;
+  tdice.forEach((d, i) => {
+    const ang = (i / n) * Math.PI * 2 + 0.6, rad = n > 1 ? ds * 0.75 : 0;
+    d.x = Math.min(T - r, Math.max(r, p.x + Math.cos(ang) * rad));
+    d.y = Math.min(T - r, Math.max(r, p.y + Math.sin(ang) * rad));
+  });
+}
+tray.addEventListener('pointerdown', e => {
+  if (anyMoving()) return;
+  const p = trayPoint(e);
+  tray.setPointerCapture(e.pointerId);
+  drag = [p];
+  holding = true;
+  tdice = kindsOnTable().map(k => newDie(k, p.x, p.y));
+  placeInHand(p);
+  landed = [];
+  startLoop();
+});
+tray.addEventListener('pointermove', e => {
+  if (!holding) return;
+  const p = trayPoint(e);
+  drag.push(p); if (drag.length > 8) drag.shift();
+  placeInHand(p);
+  for (const d of tdice) { d.a += 0.05; if (Math.random() < 0.2) d.face = randFace(d.face); }  // shaking
+});
+function release() {
+  if (!holding) return;
+  const now = performance.now();
+  const recent = drag.filter(p => now - p.t < 110);
+  let vx = 0, vy = 0;
+  if (recent.length >= 2) {
+    const a = recent[0], b = recent[recent.length - 1], dt = Math.max(0.016, (b.t - a.t) / 1000);
+    vx = (b.x - a.x) / dt; vy = (b.y - a.y) / dt;
+  }
+  const sp = Math.hypot(vx, vy), max = T * 3.2;
+  if (sp > max) { vx *= max / sp; vy *= max / sp; }
+  if (sp < T * 0.3) {                         // just a tap: a small random toss
+    const ang = Math.random() * Math.PI * 2, s = T * (0.4 + Math.random() * 0.6);
+    vx = Math.cos(ang) * s; vy = Math.sin(ang) * s;
+  }
+  drag = null;
+  holding = false;
+  launchAll(vx, vy);
+}
+tray.addEventListener('pointerup', release);
+tray.addEventListener('pointercancel', release);
+tray.addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); throwDie(); }
+});
+
+// =========================================================================
+// page wiring
+// =========================================================================
+function overlaySVG() {
+  const P = BAND_PITCH_MM, w = P * DISC_LINE_RATIO, D = Math.ceil(discDiameterMm()), r = D / 2;
+  const n = Math.ceil(r / P) + 1, pad = 2;
+  let rects = '';
+  for (let k = -n; k <= n; k++)
+    rects += `<rect x="${-r}" y="${(k * P - w / 2).toFixed(3)}" width="${D}" height="${w}"/>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${D + 2 * pad}mm" height="${D + 2 * pad}mm" viewBox="${-r - pad} ${-r - pad} ${D + 2 * pad} ${D + 2 * pad}">` +
+    `<defs><clipPath id="disc"><circle r="${r}"/></clipPath></defs>` +
+    `<g clip-path="url(#disc)" fill="#000">${rects}<circle r="2" fill="#fff"/></g>` +
+    `<circle r="${r}" fill="none" stroke="#000" stroke-width="0.25"/>` +
+    `<circle r="2" fill="none" stroke="#000" stroke-width="0.2"/></svg>`;
+}
+
+function onResized() {
+  sizeTray();
+  clampPivot();
+  onPivot();
+  $('f-pitch').textContent = mm(BAND_PITCH_MM);
+  $('f-line').textContent = mm(BAND_PITCH_MM * DISC_LINE_RATIO);
+  $('f-tile').textContent = mm(cellMm());
+  $('f-grid').textContent = mm(gridMm());
+  $('f-disc').textContent = Math.ceil(discDiameterMm()) + ' mm';
+  $('overlay-thumb').innerHTML = overlaySVG();
+  const card = $('card');
+  card.style.width = (85.6 * pxPerMm) + 'px';
+  card.style.height = (53.98 * pxPerMm) + 'px';
+  $('cal').value = pxPerMm;
+  $('cal-out').textContent = `${pxPerMm.toFixed(3)} px/mm` + (Math.abs(pxPerMm - NOMINAL_PX_PER_MM) < 0.001 ? ' (not calibrated)' : '');
+}
+
+$('throw').addEventListener('click', () => throwDie());
+$('roll').addEventListener('click', () => rollDice());
+$('clear').addEventListener('click', () => clearGrid());
+$('size').addEventListener('change', e => setGridSize(+e.target.value));
+$('tilt').addEventListener('change', e => { setTilt(e.target.checked); onRolled(dice, turns, inverts, tilts, rollCount); });
+$('show').addEventListener('change', e => setShowDice(e.target.checked));
+$('pivot').addEventListener('change', e => {
+  setPivotMark(e.target.checked);
+  $('pivot-panel').hidden = !e.target.checked;
+  const cvs = document.querySelector('#stage canvas');
+  cvs.style.cursor = e.target.checked ? 'crosshair' : '';
+  cvs.style.touchAction = e.target.checked ? 'none' : '';     // drag the mark instead of scrolling
+});
+
+// ---- pivot controls ----------------------------------------------------
+const signed = v => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v).toFixed(1) + ' mm';
+function onPivot() {
+  const h = Math.floor(gridMm() / 2 * 2) / 2;      // slider limits on the 0.5 mm steps
+  for (const [id, v] of [['pivot-x', pivotMm.x], ['pivot-y', pivotMm.y]]) {
+    $(id).min = -h; $(id).max = h; $(id).value = v;
+    $(id + '-out').textContent = signed(v);
+  }
+  $('f-disc').textContent = Math.ceil(discDiameterMm()) + ' mm';
+  $('overlay-thumb').innerHTML = overlaySVG();
+}
+$('pivot-x').addEventListener('input', e => setPivot(+e.target.value, pivotMm.y));
+$('pivot-y').addEventListener('input', e => setPivot(pivotMm.x, +e.target.value));
+$('pivot-centre').addEventListener('click', () => setPivot(0, 0));
+
+// Drag the mark on the grid (only while Pivot mark is on)
+let pivotDrag = false;
+function pivotFromPointer(e) {
+  const cvs = document.querySelector('#stage canvas'), b = cvs.getBoundingClientRect();
+  let x = e.clientX - b.left, y = e.clientY - b.top;
+  if (!e.altKey) {                                   // snap to cell corners and centres
+    const half = (width / N) / 2, snap = 8;
+    const sx = Math.round(x / half) * half, sy = Math.round(y / half) * half;
+    if (Math.abs(sx - x) < snap) x = sx;
+    if (Math.abs(sy - y) < snap) y = sy;
+  }
+  setPivot((x - width / 2) / pxPerMm, (y - height / 2) / pxPerMm);
+}
+$('stage').addEventListener('pointerdown', e => {
+  if (!pivotMark || e.target.tagName !== 'CANVAS') return;
+  pivotDrag = true;
+  e.target.setPointerCapture(e.pointerId);
+  pivotFromPointer(e);
+});
+$('stage').addEventListener('pointermove', e => { if (pivotDrag) pivotFromPointer(e); });
+$('stage').addEventListener('pointerup', () => { pivotDrag = false; });
+$('stage').addEventListener('pointercancel', () => { pivotDrag = false; });
+$('preview').addEventListener('change', e => setPreview(e.target.checked));
+$('spin').addEventListener('input', e => { setPreviewSpin(+e.target.value); $('spin-out').textContent = e.target.value + '°/s'; });
+$('cal').addEventListener('input', e => setCalibration(+e.target.value));
+$('cal-reset').addEventListener('click', () => {
+  try { localStorage.removeItem('diceGrid.pxPerMm'); } catch (e) {}
+  pxPerMm = NOMINAL_PX_PER_MM; sizeCanvas();
+});
+$('copy-svg').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(overlaySVG()); $('copy-out').textContent = 'Copied. Paste into a .svg file to print.'; }
+  catch (e) { $('copy-out').textContent = 'Copy was blocked by the browser.'; }
+});
+if (reduceMotion) { $('spin').value = 0; $('spin-out').textContent = '0°/s'; }
+</script>
+</body>
+</html>
