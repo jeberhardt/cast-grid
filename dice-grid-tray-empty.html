@@ -64,7 +64,7 @@ select { font: inherit; color: var(--fg); background: var(--surface); border: 1p
 <div class="wrap">
   <header>
     <h1>Dice Grid · dice on the table</h1>
-    <p class="lede">Throw the dice into the tray. The tray is the same size as the grid and split into the same cells, and wherever the <b>white</b> die comes to rest picks the one cell that changes. Instead of pips it shows bands: its face is the tile that cell will get, with the same number of bands starting from the same corner, and it turns as the die turns. Pick <b>Straight</b> or <b>Curved</b> bands under Pattern; curved bands are quarter circles around the start corner and meet the curves in neighbouring cells. The <b>grey</b> die shows a colour sample instead of pips: whichever way up it lands, light ground with a dark band or dark ground with a light band, is how that cell is coloured. Where it lands doesn't matter. Throw with the button or Space, or press in the tray and flick.</p>
+    <p class="lede">Throw the dice into the tray. The tray is the same size as the grid and split into the same cells, and wherever the <b>white</b> die comes to rest picks the one cell that changes. Instead of pips it shows bands: its face is the tile that cell will get, with the same number of bands starting from the same corner, and it turns as the die turns. Pick <b>Straight</b> or <b>Curved</b> bands under Pattern; curved bands are quarter circles around the start corner and meet the curves in neighbouring cells. The <b>grey</b> die shows a colour sample instead of pips: whichever way up it lands, light ground with a dark band or dark ground with a light band, is how that cell is coloured. Where it lands doesn't matter. Untick <b>Colour die</b> to take it off the table: cells then keep the colour they have. Throw with the button or Space, or press in the tray and flick.</p>
   </header>
 
   <div class="stages">
@@ -95,6 +95,7 @@ select { font: inherit; color: var(--fg); background: var(--surface); border: 1p
         <option value="curved">Curved</option>
       </select>
     </label>
+    <label for="colour-die"><input id="colour-die" type="checkbox" checked> Colour die</label>
     <label for="show"><input id="show" type="checkbox"> Show dice</label>
   </div>
   <div class="tally" id="tally"></div>
@@ -160,6 +161,7 @@ let dice = [];             // face die:   dice[row][col]    = 0..6 (0 = empty)
 let turns = [];            // turn die:   turns[row][col]   = 1..6
 let inverts = [];          // invert die: inverts[row][col] = 1..6
 let showDice = false;
+let useInvert = true;      // false: no colour die; cells keep their colour
 let rollCount = 0;
 
 const PAPER = '#ECEEF1';
@@ -186,16 +188,23 @@ function sizeCanvas() {
 function applyLoop() { noLoop(); redraw(); }
 
 function setShowDice(on) { showDice = on; redraw(); }
+function setUseInvert(on) {
+  useInvert = on;
+  if (!on) tdice = tdice.filter(d => d.kind !== 'invert');   // take it off the table
+  redraw();
+  if (typeof drawTray === 'function') drawTray();
+}
 
 // ---- dice -----------------------------------------------------------------
 function rollDice() {
+  const prev = inverts;
   dice = []; turns = []; inverts = [];
   for (let r = 0; r < N; r++) {
     const f = [], t = [], k = [];
     for (let c = 0; c < N; c++) {
       f.push(rollFace(r));
       t.push(floor(random(1, 7)));
-      k.push(floor(random(1, 7)));
+      k.push(useInvert ? floor(random(1, 7)) : (prev[r] ? prev[r][c] : 1));
     }
     dice.push(f); turns.push(t); inverts.push(k);
   }
@@ -309,7 +318,7 @@ function draw() {
     for (let r = 0; r < N; r++)
       for (let c = 0; c < N; c++) {
         drawDie(dice[r][c], c * cell, r * cell, cell, 'face');
-        drawDie(inverts[r][c], c * cell, r * cell, cell, 'invert');
+        if (useInvert) drawDie(inverts[r][c], c * cell, r * cell, cell, 'invert');
         drawDie(turns[r][c], c * cell, r * cell, cell, 'turn');
       }
   }
@@ -504,7 +513,7 @@ const history = [];
 
 const dieSize = () => (T / N) * 0.5;
 const randFace = (not) => { let f; do { f = 1 + Math.floor(Math.random() * 6); } while (f === not); return f; };
-const kindsOnTable = () => ['face', 'invert'];
+const kindsOnTable = () => useInvert ? ['face', 'invert'] : ['face'];
 const anyMoving = () => tdice.some(d => d.moving);
 
 function newDie(kind, x, y) {
@@ -919,6 +928,7 @@ $('roll').addEventListener('click', () => rollDice());
 $('clear').addEventListener('click', () => clearGrid());
 $('size').addEventListener('change', e => setGridSize(+e.target.value));
 $('show').addEventListener('change', e => setShowDice(e.target.checked));
+$('colour-die').addEventListener('change', e => setUseInvert(e.target.checked));
 $('pattern').addEventListener('change', e => setPattern(e.target.value));
 </script>
 </body>
