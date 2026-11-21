@@ -64,7 +64,7 @@ select { font: inherit; color: var(--fg); background: var(--surface); border: 1p
 <div class="wrap">
   <header>
     <h1>Dice Grid · dice on the table</h1>
-    <p class="lede">Throw the dice into the tray. The tray is the same size as the grid and split into the same cells, and wherever the <b>white</b> die comes to rest picks the one cell that changes. Instead of pips it shows bands: its face is the tile that cell will get, with the same number of bands starting from the same corner, and it turns as the die turns. Pick <b>Straight</b> or <b>Curved</b> bands under Pattern; curved bands are quarter circles around the start corner and meet the curves in neighbouring cells. Tick <b>Reverse bands</b> to count from the far side instead: a 1 is the longest arc (or the band farthest from the corner), and a 6 fills in down to the corner. The <b>grey</b> die shows a colour sample instead of pips: whichever way up it lands, light ground with a dark band or dark ground with a light band, is how that cell is coloured. Where it lands doesn't matter. Untick <b>Colour die</b> to take it off the table: cells then keep the colour they have. Throw with the button or Space, or press in the tray and flick.</p>
+    <p class="lede">Throw the dice into the tray. The tray is the same size as the grid and split into the same cells, and wherever the <b>white</b> die comes to rest picks the one cell that changes. Instead of pips it shows bands: its face is the tile that cell will get, with the same number of bands starting from the same corner, and it turns as the die turns. Pick <b>Straight</b> or <b>Curved</b> bands under Pattern; curved bands are quarter circles around the start corner and meet the curves in neighbouring cells. Tick <b>Reverse bands</b> to change the order: curved, a 1 is the longest arc and a 6 fills in down to the corner; straight, a 1 is the band nearest the middle and the rest alternate side to side outward until a 6 fills the tile. The <b>grey</b> die shows a colour sample instead of pips: whichever way up it lands, light ground with a dark band or dark ground with a light band, is how that cell is coloured. Where it lands doesn't matter. Under <b>Colour</b>, pick <b>Flip on each hit</b> to take the grey die off the table and instead swap a cell between light and dark every time the white die lands on it again; an empty cell instead takes the opposite colour to the last cell a throw changed, or <b>Keep</b> to leave colours as they are. Throw with the button or Space, or press in the tray and flick.</p>
   </header>
 
   <div class="stages">
@@ -84,19 +84,25 @@ select { font: inherit; color: var(--fg); background: var(--surface); border: 1p
     <button class="ghost" id="roll" type="button">Roll every cell</button>
     <button class="ghost" id="clear" type="button">Clear grid</button>
     <label for="size">Grid
-      <select id="size">
-        <option value="3">3 × 3</option><option value="4">4 × 4</option><option value="5">5 × 5</option>
-        <option value="6" selected>6 × 6</option><option value="8">8 × 8</option><option value="10">10 × 10</option>
+      <select id="size" autocomplete="off">
+        <option value="3">3 × 3</option><option value="4">4 × 4</option><option value="5" selected>5 × 5</option>
+        <option value="6">6 × 6</option><option value="8">8 × 8</option><option value="10">10 × 10</option>
       </select>
     </label>
     <label for="pattern">Pattern
-      <select id="pattern">
-        <option value="straight" selected>Straight</option>
-        <option value="curved">Curved</option>
+      <select id="pattern" autocomplete="off">
+        <option value="straight">Straight</option>
+        <option value="curved" selected>Curved</option>
       </select>
     </label>
-    <label for="reverse"><input id="reverse" type="checkbox"> Reverse bands</label>
-    <label for="colour-die"><input id="colour-die" type="checkbox" checked> Colour die</label>
+    <label for="reverse"><input id="reverse" type="checkbox" checked autocomplete="off"> Reverse bands</label>
+    <label for="colour-mode">Colour
+      <select id="colour-mode" autocomplete="off">
+        <option value="die">Grey die</option>
+        <option value="flip" selected>Flip on each hit</option>
+        <option value="keep">Keep</option>
+      </select>
+    </label>
     <label for="show"><input id="show" type="checkbox"> Show dice</label>
   </div>
   <div class="tally" id="tally"></div>
@@ -157,12 +163,14 @@ function cellMm() { return 6 * BAND_PITCH_MM / Math.SQRT2; }
 function gridMm() { return N * cellMm(); }
 
 // ---- state ----------------------------------------------------------------
-let N = 6;
+let N = 5;
 let dice = [];             // face die:   dice[row][col]    = 0..6 (0 = empty)
 let turns = [];            // turn die:   turns[row][col]   = 1..6
 let inverts = [];          // invert die: inverts[row][col] = 1..6
 let showDice = false;
-let useInvert = true;      // false: no colour die; cells keep their colour
+let colourMode = 'flip';    // 'die': grey die · 'flip': swap on each repeat hit · 'keep': unchanged
+let lastInvert = null;     // colour of the last cell a throw changed (null: none yet)
+let useInvert = false;     // the grey die is on the table (colourMode === 'die')
 let rollCount = 0;
 
 const PAPER = '#ECEEF1';
@@ -189,8 +197,9 @@ function sizeCanvas() {
 function applyLoop() { noLoop(); redraw(); }
 
 function setShowDice(on) { showDice = on; redraw(); }
-function setUseInvert(on) {
-  useInvert = on;
+function setColourMode(m) {
+  colourMode = m;
+  const on = useInvert = m === 'die';
   if (!on) tdice = tdice.filter(d => d.kind !== 'invert');   // take it off the table
   redraw();
   if (typeof drawTray === 'function') drawTray();
@@ -199,13 +208,14 @@ function setUseInvert(on) {
 // ---- dice -----------------------------------------------------------------
 function rollDice() {
   const prev = inverts;
+  lastInvert = null;         // every cell changed: no single last cell
   dice = []; turns = []; inverts = [];
   for (let r = 0; r < N; r++) {
     const f = [], t = [], k = [];
     for (let c = 0; c < N; c++) {
       f.push(rollFace(r));
       t.push(floor(random(1, 7)));
-      k.push(useInvert ? floor(random(1, 7)) : (prev[r] ? prev[r][c] : 1));
+      k.push(colourMode !== 'keep' ? floor(random(1, 7)) : (prev[r] ? prev[r][c] : 1));   // Keep: leave colours
     }
     dice.push(f); turns.push(t); inverts.push(k);
   }
@@ -216,6 +226,7 @@ function rollDice() {
 
 // Empty grid: no bands, light ground everywhere. Single throws then fill it in.
 function clearGrid() {
+  lastInvert = null;
   dice = []; turns = []; inverts = [];
   for (let r = 0; r < N; r++) {
     dice.push(new Array(N).fill(0)); turns.push(new Array(N).fill(1));
@@ -329,14 +340,19 @@ function bandSpacing(s) { return (s * Math.SQRT2) / 6; }
 function bandWidth(s) { return bandSpacing(s) * bandRatio; }
 let bandRatio = 0.5;
 function setBandRatio(f) { bandRatio = f; buildGrid(); drawFaceKey(true); redraw(); }
-let pattern = 'straight';  // 'straight' | 'curved'
-let reverseBands = false;  // true: bands count in from the far side (1 = longest arc)
+let pattern = 'curved';    // 'straight' | 'curved'
+let reverseBands = true;   // true: bands count in from the far side (1 = longest arc)
 function setReverse(on) {
   reverseBands = on; buildGrid(); drawFaceKey(true); redraw();
   if (typeof drawTray === 'function') drawTray();
 }
 // Slot (0 = nearest the start corner … 5 = farthest) of the i-th band of v.
 const bandSlot = i => reverseBands ? 5 - i : i;
+// Straight bands, reversed, on the die face: start with the band nearest the
+// middle (slot 3 sits closest to the face's centre line), then alternate
+// sides outward. Grid tiles work this out per tile in drawTile.
+const MIDDLE_OUT = [3, 2, 4, 1, 5, 0];
+const straightSlot = i => reverseBands ? MIDDLE_OUT[i] : i;
 function setPattern(v) {
   pattern = v; buildGrid(); drawFaceKey(true); redraw();
   if (typeof drawTray === 'function') drawTray();
@@ -413,14 +429,16 @@ function drawTile(v, t, k, r, c, s, g, origin = null) {
   // starting with the outermost lattice band that lies fully inside it.
   const E = h * (Math.abs(Math.cos(phi)) + Math.abs(Math.sin(phi)));
   const m0 = Math.floor((E - W / 2 - base) / P + 1e-6);
-  // Reversed: count in from the opposite corner instead, so 1 is the band
-  // farthest from the start corner and 6 reaches it.
-  const m1 = Math.ceil((-E + W / 2 - base) / P - 1e-6);
+  // The six lattice bands in the cell, from the corner inward: m0 … m0−5.
+  // Reversed: take them middle-out instead, nearest the cell's centre first.
+  // Where they sit depends on the turn (the lattice is shared across cells),
+  // so sort by actual distance rather than by a fixed slot order; the
+  // distances alternate side to side, so this goes outward one side, then
+  // the other.
+  let order = [0, 1, 2, 3, 4, 5].map(k => m0 - k);
+  if (reverseBands) order.sort((a, b) => Math.abs(base + a * P) - Math.abs(base + b * P));
   p.fill(band);
-  for (let i = 0; i < v; i++) {
-    const m = reverseBands ? m1 + i : m0 - i;
-    p.rect(-s, base + m * P - W / 2, s * 2, W);
-  }
+  for (let i = 0; i < v; i++) p.rect(-s, base + order[i] * P - W / 2, s * 2, W);
 
   ctx.restore();
   p.pop();
@@ -705,6 +723,16 @@ function land() {
   const turn = (((q % 4) + 4) % 4) + 1;
   const changes = [{ r, c, kind: 'face', value: faceDie.face, turn }];
   const parts = [`face ${faceDie.face}, from ${CORNER[turn]}`];
+  // Flip on each hit: a cell that already has bands swaps light ↔ dark.
+  // An empty cell takes the opposite colour to the last cell a throw changed
+  // (light if there hasn't been one since the grid was cleared or rolled).
+  if (colourMode === 'flip') {
+    const empty = dice[r][c] === 0;
+    const from = empty ? lastInvert : inverts[r][c];
+    const value = from === null ? 1 : from >= 4 ? 1 : 4;
+    changes.push({ r, c, kind: 'invert', value });
+    parts.push(`${empty ? 'opposite of last' : 'flip'} → ${value >= 4 ? 'dark' : 'light'}`);
+  }
   for (const d of tdice) {
     if (d.kind === 'invert') {
       changes.push({ r, c, kind: 'invert', value: d.face });
@@ -713,6 +741,7 @@ function land() {
   }
   throwCount++;
   applyThrow(changes);
+  lastInvert = inverts[r][c];
   const msg = `Throw ${throwCount} → row ${r + 1}, col ${c + 1} · ` + parts.join(' · ');
   $('landing').textContent = msg;
   history.unshift(msg);
@@ -850,7 +879,7 @@ function drawBandFace(ctx, v, ds) {
     ctx.rotate(Math.PI / 4);
     const D = s * Math.SQRT1_2, P = (s * Math.SQRT2) / 6, W = P * bandRatio;
     ctx.fillStyle = INK;
-    for (let i = 0; i < v; i++) ctx.fillRect(-s, D - bandSlot(i) * P - W, s * 2, W);
+    for (let i = 0; i < v; i++) ctx.fillRect(-s, D - straightSlot(i) * P - W, s * 2, W);
   }
   ctx.restore();
   ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 0.75;
@@ -947,7 +976,7 @@ $('roll').addEventListener('click', () => rollDice());
 $('clear').addEventListener('click', () => clearGrid());
 $('size').addEventListener('change', e => setGridSize(+e.target.value));
 $('show').addEventListener('change', e => setShowDice(e.target.checked));
-$('colour-die').addEventListener('change', e => setUseInvert(e.target.checked));
+$('colour-mode').addEventListener('change', e => setColourMode(e.target.value));
 $('reverse').addEventListener('change', e => setReverse(e.target.checked));
 $('pattern').addEventListener('change', e => setPattern(e.target.value));
 </script>
